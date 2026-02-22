@@ -8,3 +8,14 @@ urfd
 inicheck
 dbutil
 tcd
+
+# Docker runtime
+docker/logs/*
+!docker/logs/.gitkeep
+
+# Allow docker config files (override the urfd.* / tcd.* rules above)
+!docker/config/urfd.ini
+!docker/config/urfd.blacklist
+!docker/config/urfd.whitelist
+!docker/config/urfd.interlink
+!docker/config/tcd.ini

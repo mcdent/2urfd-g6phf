@@ -1,0 +1,59 @@
+services:
+
+  # ── urfd + tcd ──────────────────────────────────────────────────────────────
+  # urfd and tcd share abstract UNIX DGRAM sockets so they must be co-located.
+  # privileged: true is required for rmmod ftdi_sio/usbserial and USB access.
+  urfd:
+    build:
+      context: ..                          # repo root — contains reflector/, transcoder/ etc.
+      dockerfile: docker/urfd/Dockerfile
+    container_name: urfd
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - ENABLE_TCD=false   # set to true when DVSI hardware is connected
+    devices:
+      - /dev/bus/usb:/dev/bus/usb    # DVSI USB hardware passthrough
+    volumes:
+      # Runtime config (edit files in ./config/ before starting)
+      - ./config/urfd.ini:/etc/urfd/urfd.ini:ro
+      - ./config/tcd.ini:/etc/urfd/tcd.ini:ro
+      - ./config/urfd.blacklist:/etc/urfd/urfd.blacklist:ro
+      - ./config/urfd.whitelist:/etc/urfd/urfd.whitelist:ro
+      - ./config/urfd.interlink:/etc/urfd/urfd.interlink:ro
+      # Persistent state (DHT peer cache, downloaded DB files)
+      - urfd-state:/var/lib/urfd
+      # All logs (shared with dashboard)
+      - ./logs:/logs
+    ports:
+      - "10017:10017/udp"   # URF interlinking
+      - "17000:17000/udp"   # M17
+      - "20001:20001/udp"   # DPlus
+      - "30001:30001/udp"   # DExtra
+      - "30051:30051/udp"   # DCS
+      - "40000:40000/udp"   # DSD
+      - "41000:41000/udp"   # P25
+      - "41400:41400/udp"   # NXDN
+      - "42000:42000/udp"   # YSF
+      - "10002:10002/udp"   # BrandMeister XLX peering
+      - "62030:62030/udp"   # MMDVM (direct hotspot DMR)
+
+  # ── Dashboard (nginx + php-fpm) ─────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ..                              # repo root
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: urfd-dashboard
+    restart: unless-stopped
+    volumes:
+      # urfd.xml, urfd.pid and nginx logs all live here
+      - ./logs:/logs
+      # User-edited dashboard config
+      - ./config/dashboard-config.inc.php:/var/www/html/pgs/config.inc.php:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - urfd
+
+volumes:
+  urfd-state:   # DHT state + downloaded DB files (dmrid, nxdn, ysf)

@@ -1,0 +1,61 @@
+<?php
+/*
+Possible values for IPModus:
+  HideIP / ShowFullIP / ShowLast1ByteOfIP / ShowLast2ByteOfIP / ShowLast3ByteOfIP
+*/
+
+date_default_timezone_set("Europe/London");
+
+$Service     = array();
+$CallingHome = array();
+$PageOptions = array();
+
+$PageOptions['ContactEmail']      = 'example@example.com';
+$PageOptions['DashboardVersion']  = '2.5.0';
+
+$PageOptions['PageRefreshActive'] = true;
+$PageOptions['PageRefreshDelay']  = '10000';
+
+$PageOptions['RepeatersPage'] = array();
+$PageOptions['RepeatersPage']['LimitTo']             = 99;
+$PageOptions['RepeatersPage']['IPModus']             = 'ShowLast2ByteOfIP';
+$PageOptions['RepeatersPage']['MasqueradeCharacter'] = '*';
+
+$PageOptions['PeerPage'] = array();
+$PageOptions['PeerPage']['LimitTo']                  = 99;
+$PageOptions['PeerPage']['IPModus']                  = 'ShowLast2ByteOfIP';
+$PageOptions['PeerPage']['MasqueradeCharacter']      = '*';
+
+$PageOptions['LastHeardPage']['LimitTo']             = 39;
+
+$PageOptions['ModuleNames'] = array();
+$PageOptions['ModuleNames']['A'] = 'NXDN Only (No transcode)';
+$PageOptions['ModuleNames']['D'] = 'Multimode Chat';
+$PageOptions['ModuleNames']['M'] = 'M17 Chat';
+$PageOptions['ModuleNames']['S'] = 'DStar Chat';
+$PageOptions['ModuleNames']['Z'] = 'Temp Meeting';
+
+$PageOptions['MetaDescription'] = 'URF is a D-Star Reflector System for Ham Radio Operators.';
+$PageOptions['MetaKeywords']    = 'Ham Radio, D-Star, XReflector, XLX, XRF, DCS, REF, M17,';
+$PageOptions['MetaAuthor']      = 'LX1IQ';
+$PageOptions['MetaRevisit']     = 'After 30 Days';
+$PageOptions['MetaRobots']      = 'index,follow';
+
+$PageOptions['UserPage']['ShowFilter'] = true;
+
+// These paths match the Docker volume mounts
+$Service['PIDFile'] = '/logs/urfd.pid';
+$Service['XMLFile'] = '/logs/urfd.xml';
+
+$CallingHome['Active']           = true;
+$CallingHome['MyDashBoardURL']   = 'http://xlx.g6phf.co.uk';
+$CallingHome['ServerURL']        = 'http://xlxapi.rlx.lu/api.php';
+$CallingHome['PushDelay']        = 10;
+$CallingHome['Country']          = 'GB';
+$CallingHome['Comment']          = 'XLX825 - G6PHF';
+$CallingHome['HashFile']         = '/logs/callinghome.php';
+$CallingHome['LastCallHomefile'] = '/logs/lastcallhome.php';
+$CallingHome['OverrideIPAddress'] = '82.68.53.241';
+$CallingHome['InterlinkFile']    = '/etc/urfd/urfd.interlink';
+
+?>
