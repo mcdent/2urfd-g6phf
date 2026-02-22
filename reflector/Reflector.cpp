@@ -55,7 +55,7 @@ bool CReflector::Start(void)
 	const auto cs(g_Configure.GetString(g_Keys.names.callsign));
 	m_Callsign.SetCallsign(cs, false);
 	m_Modules.assign(g_Configure.GetString(g_Keys.modules.modules));
-	std::string tcmods(g_Configure.GetString(g_Keys.tc.tcmodules));
+	std::string tcmods(g_Configure.Contains(g_Keys.tc.tcmodules) ? g_Configure.GetString(g_Keys.tc.tcmodules) : "");
 
 #ifndef NO_DHT
 	// start the dht instance

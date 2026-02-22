@@ -609,31 +609,38 @@ bool CConfigure::ReadData(const std::string &path)
 		}
 	}
 
-	// Transcoder section
-	if (isDefined(ErrorLevel::fatal, JTRANSCODER, JTRANSCODED, g_Keys.tc.tcmodules, rval))
+	// Transcoder section — optional. Only validated when [Transcoder] is present in the ini.
+	if (data.contains(g_Keys.tc.tcmodules) || data.contains(g_Keys.tc.dmrgainin))
 	{
-		const auto tcmods(data[g_Keys.tc.tcmodules].get<std::string>());
-
-		// how many transcoded modules
-		auto size = tcmods.size();
-		if (3 != size && 1 != size)
-			std::cout << "WARNING: [" << JMODULES << ']' << JTRANSCODED << " doesn't define one (or three) modules" << std::endl;
-
-		// make sure each transcoded module is configured
-		const std::string mods(Contains(g_Keys.modules.modules) ? data[g_Keys.modules.modules].get<std::string>() : "");
-		for (auto c : tcmods)
+		if (isDefined(ErrorLevel::fatal, JTRANSCODER, JTRANSCODED, g_Keys.tc.tcmodules, rval))
 		{
-			if (std::string::npos == mods.find(c))
+			const auto tcmods(data[g_Keys.tc.tcmodules].get<std::string>());
+
+			// how many transcoded modules
+			auto size = tcmods.size();
+			if (3 != size && 1 != size)
+				std::cout << "WARNING: [" << JMODULES << ']' << JTRANSCODED << " doesn't define one (or three) modules" << std::endl;
+
+			// make sure each transcoded module is configured
+			const std::string mods(Contains(g_Keys.modules.modules) ? data[g_Keys.modules.modules].get<std::string>() : "");
+			for (auto c : tcmods)
 			{
-				std::cerr << "ERROR: transcoded module '" << c << "' not found in defined modules" << std::endl;
-				rval = true;
+				if (std::string::npos == mods.find(c))
+				{
+					std::cerr << "ERROR: transcoded module '" << c << "' not found in defined modules" << std::endl;
+					rval = true;
+				}
 			}
 		}
+		isDefined(ErrorLevel::fatal, JTRANSCODER, JDMRYSFGAININ,  g_Keys.tc.dmrgainin,    rval);
+		isDefined(ErrorLevel::fatal, JTRANSCODER, JDMRYSFGAINOUT, g_Keys.tc.dmrgainout,   rval);
+		isDefined(ErrorLevel::fatal, JTRANSCODER, JDSTARGAININ,   g_Keys.tc.dstargainin,  rval);
+		isDefined(ErrorLevel::fatal, JTRANSCODER, JDSTARGAINOUT,  g_Keys.tc.dstargainout, rval);
 	}
-	isDefined(ErrorLevel::fatal, JTRANSCODER, JDMRYSFGAININ,  g_Keys.tc.dmrgainin,    rval);
-	isDefined(ErrorLevel::fatal, JTRANSCODER, JDMRYSFGAINOUT, g_Keys.tc.dmrgainout,   rval);
-	isDefined(ErrorLevel::fatal, JTRANSCODER, JDSTARGAININ,   g_Keys.tc.dstargainin,  rval);
-	isDefined(ErrorLevel::fatal, JTRANSCODER, JDSTARGAINOUT,  g_Keys.tc.dstargainout, rval);
+	else
+	{
+		std::cout << "INFO: No [Transcoder] section — transcoding disabled" << std::endl;
+	}
 
 	// "simple" protocols with only a Port
 	isDefined(ErrorLevel::fatal, JDCS, JPORT, g_Keys.dcs.port, rval);
