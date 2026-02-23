@@ -39,23 +39,19 @@ if ($CallingHome['Active']) {
         $LastSync = 0;
         $Ressource = @fopen($CallingHome['HashFile'], "w");
         if ($Ressource) {
-            @fwrite($Ressource, "<?php\n");
-            @fwrite($Ressource, "\n" . '$LastSync = 0;');
-            @fwrite($Ressource, "\n" . '$Hash     = "' . $Hash . '";');
-            @fwrite($Ressource, "\n\n" . '?>');
+            @fwrite($Ressource, json_encode(['LastSync' => 0, 'Hash' => $Hash]));
             @fclose($Ressource);
-            @exec("chmod 777 " . $CallingHome['HashFile']);
+            @chmod($CallingHome['HashFile'], 0644);
             $CallHomeNow = true;
         }
     } else {
-        include($CallingHome['HashFile']);
+        $chdata = json_decode(@file_get_contents($CallingHome['HashFile']), true);
+        $LastSync = isset($chdata['LastSync']) ? (int)$chdata['LastSync'] : 0;
+        $Hash = isset($chdata['Hash']) ? $chdata['Hash'] : CreateCode(16);
         if ($LastSync < (time() - $CallingHome['PushDelay'])) {
             $Ressource = @fopen($CallingHome['HashFile'], "w");
             if ($Ressource) {
-                @fwrite($Ressource, "<?php\n");
-                @fwrite($Ressource, "\n" . '$LastSync = ' . time() . ';');
-                @fwrite($Ressource, "\n" . '$Hash     = "' . $Hash . '";');
-                @fwrite($Ressource, "\n\n" . '?>');
+                @fwrite($Ressource, json_encode(['LastSync' => time(), 'Hash' => $Hash]));
                 @fclose($Ressource);
             }
             $CallHomeNow = true;
@@ -104,6 +100,10 @@ if ($CallingHome['Active']) {
     <![endif]-->
     <?php
 
+    // Whitelist $_GET['show'] to prevent reflected XSS
+    $_allowed_shows = ['', 'users', 'repeaters', 'peers', 'reflectors', 'livequadnet', 'interlinks'];
+    $_GET['show'] = (isset($_GET['show']) && in_array($_GET['show'], $_allowed_shows, true)) ? $_GET['show'] : '';
+
     if ($PageOptions['PageRefreshActive']) {
         echo '
    <script src="./js/jquery-1.12.4.min.js"></script>
@@ -135,7 +135,6 @@ if ($CallingHome['Active']) {
       }
    </script>';
     }
-    if (!isset($_GET['show'])) $_GET['show'] = "";
     ?>
 </head>
 <body>
