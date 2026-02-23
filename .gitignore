@@ -13,7 +13,8 @@ tcd
 docker/logs/*
 !docker/logs/.gitkeep
 
-# Allow docker config files (override the urfd.* / tcd.* rules above)
+# Allow docker config files and service unit (override the urfd.* / tcd.* rules above)
+!docker/urfd.service
 !docker/config/urfd.ini
 !docker/config/urfd.blacklist
 !docker/config/urfd.whitelist
