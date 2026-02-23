@@ -17,8 +17,41 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <sys/stat.h>
+#include <streambuf>
+#include <ctime>
 
 #include "Global.h"
+
+// Prepends an ISO 8601 UTC timestamp to every line written to a stream.
+// Installed over std::cout and std::cerr in main() so all log output is
+// timestamped without touching any other source file.
+class CTimestampBuf : public std::streambuf
+{
+public:
+	CTimestampBuf(std::streambuf *orig) : m_orig(orig), m_newline(true) {}
+protected:
+	int overflow(int c) override
+	{
+		if (c == EOF) return EOF;
+		if (m_newline)
+		{
+			auto now = std::time(nullptr);
+			struct tm t;
+			gmtime_r(&now, &t);
+			char buf[32];
+			strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ ", &t);
+			for (const char *p = buf; *p; ++p)
+				m_orig->sputc(*p);
+			m_newline = false;
+		}
+		if (c == '\n') m_newline = true;
+		return m_orig->sputc(c);
+	}
+	int sync() override { return m_orig->pubsync(); }
+private:
+	std::streambuf *m_orig;
+	bool m_newline;
+};
 
 #ifndef UTILITY
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +70,13 @@ CLookupYsf  g_LYtr;
 
 int main(int argc, char *argv[])
 {
+	CTimestampBuf tsbuf_out(std::cout.rdbuf());
+	CTimestampBuf tsbuf_err(std::cerr.rdbuf());
+	std::cout.rdbuf(&tsbuf_out);
+	std::cerr.rdbuf(&tsbuf_err);
+	std::cout << std::unitbuf;  // flush after every write (avoids buffering when piped)
+	std::cerr << std::unitbuf;
+
 	if (argc != 2)
 	{
 		std::cerr << "No configuration file specified! Usage: " << argv[0] << " /pathname/to/configuration/file" << std::endl;

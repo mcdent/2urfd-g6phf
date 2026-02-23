@@ -692,7 +692,7 @@ void CReflector::PutDHTConfig()
 	cfg.ipv4addr.assign(g_Configure.GetString(g_Keys.ip.ipv4address));
 	cfg.ipv6addr.assign(g_Configure.GetString(g_Keys.ip.ipv6address));
 	cfg.modules.assign(g_Configure.GetString(g_Keys.modules.modules));
-	cfg.transcodedmods.assign(g_Configure.GetString(g_Keys.tc.tcmodules));
+	cfg.transcodedmods.assign(g_Configure.Contains(g_Keys.tc.tcmodules) ? g_Configure.GetString(g_Keys.tc.tcmodules) : "");
 	cfg.url.assign(g_Configure.GetString(g_Keys.names.url));
 	cfg.email.assign(g_Configure.GetString(g_Keys.names.email));
 	cfg.country.assign(g_Configure.GetString(g_Keys.names.country));

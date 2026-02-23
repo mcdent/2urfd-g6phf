@@ -61,6 +61,7 @@ RUN cat > /entrypoint.sh << 'SCRIPT'
 set -e
 
 mkdir -p /logs /run/php
+chmod o+w /logs   # allow www-data (uid 33) to write callinghome.php etc.
 
 PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 php-fpm${PHP_VER} --nodaemonize &
