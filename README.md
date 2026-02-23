@@ -2,6 +2,109 @@
 
 A smaller and slightly faster *urfd* reflector. The sources are published under GPL Licenses.
 
+---
+
+## Docker Deployment (G6PHF fork)
+
+This fork adds a Docker-based deployment under `docker/`. It packages *urfd* and the dashboard into separate containers managed by Docker Compose, with optional *tcd* support for when DVSI transcoding hardware is available.
+
+### Changes from upstream
+
+- **`reflector/Configure.cpp`** — `[Transcoder]` section in `urfd.ini` is now optional. When absent, transcoding is silently disabled and urfd runs without attempting to contact *tcd*.
+- **`reflector/Reflector.cpp`** — matching guard so `tcmods` is safely empty when no transcoder is configured.
+- **`docker/`** — full Docker deployment (see below).
+
+### Prerequisites
+
+```
+sudo apt install docker.io docker-compose-plugin
+sudo usermod -aG docker $USER   # log out and back in after this
+```
+
+### Quick start
+
+```bash
+git clone https://github.com/mcdent/2urfd-g6phf.git
+cd 2urfd-g6phf
+git checkout docker
+```
+
+Edit your configuration files before first run:
+
+```bash
+# Reflector config — set your callsign, IP addresses, modules etc.
+nano docker/config/urfd.ini
+
+# Dashboard config — set module names, calling-home settings etc.
+nano docker/config/dashboard-config.inc.php
+```
+
+Then build and start:
+
+```bash
+cd docker
+docker compose build
+docker compose up -d
+```
+
+The dashboard will be available on port 80.
+
+### Configuration files
+
+All runtime config lives in `docker/config/`:
+
+| File | Purpose |
+|------|---------|
+| `urfd.ini` | Main reflector config — callsign, IP, modules, ports |
+| `tcd.ini` | Transcoder config — only used when `ENABLE_TCD=true` |
+| `dashboard-config.inc.php` | Dashboard module names, calling-home, display options |
+| `urfd.blacklist` | Callsigns blocked from linking/transmitting |
+| `urfd.whitelist` | If populated, only these callsigns are allowed |
+| `urfd.interlink` | URF peer interlinking |
+
+After editing any config file, restart the relevant container:
+
+```bash
+docker compose restart urfd        # for urfd.ini changes
+docker compose restart dashboard   # for dashboard-config.inc.php changes
+```
+
+> **Note:** Config files are bind-mounted as single files. If you edit them with an editor that does atomic writes (most do), run `docker compose down && docker compose up -d` rather than just restart — otherwise Docker may hold onto the old file inode.
+
+### Enabling the transcoder (tcd)
+
+Transcoding requires a DVSI-3000 or DVSI-3003 USB device. When you have the hardware:
+
+1. Uncomment the `[Transcoder]` section in `docker/config/urfd.ini`
+2. Set `Transcoded` to the module(s) you want transcoded (e.g. `Transcoded = A`)
+3. Set `ENABLE_TCD=true` in `docker/docker-compose.yml`
+4. Rebuild and restart: `docker compose build && docker compose down && docker compose up -d`
+
+### Auto-start with systemd (user service)
+
+To start the stack automatically at boot without requiring a login session:
+
+```bash
+# Enable lingering so user services start at boot
+sudo loginctl enable-linger $USER
+
+# Reload and enable the service
+systemctl --user daemon-reload
+systemctl --user enable urfd.service
+systemctl --user start urfd.service
+
+# Check status
+systemctl --user status urfd.service
+```
+
+The service file is at `~/.config/systemd/user/urfd.service`. It runs `docker compose up -d` from the `docker/` directory on boot and `docker compose down` on shutdown.
+
+### Firewall
+
+Same ports as upstream — see the Firewall settings section below.
+
+---
+
 ## Some preliminaries
 
 This is based on the full-blown, do-anything *urfd* reflector hosted by [nostar](https://github.com/nostar/urfd), but this *urfd* does not support all protocols. Compared to the nostar version, it doesn't have DMR+, G3, and USRP. It also **requires** a local transcoder with *two* AMBE devices, one for DStar and the other for DMR/YSF/NXDN. Instances of this *urfd* reflector will **not interlink** with instances of the version available from nostar.
