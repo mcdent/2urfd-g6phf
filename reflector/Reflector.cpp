@@ -616,11 +616,7 @@ void CReflector::PutDHTPeers()
 	node.putSigned(
 		refhash,
 		nv,
-#ifdef DEBUG
 		[](bool success){ std::cout << "PutDHTPeers() " << (success ? "successful" : "unsuccessful") << std::endl; },
-#else
-		[](bool success){ if (! success) std::cout << "PutDHTPeers() unsuccessful" << std::endl; },
-#endif
 		true	// permanent!
 	);
 }
@@ -728,11 +724,7 @@ void CReflector::PutDHTConfig()
 	node.putSigned(
 		refhash,
 		nv,
-#ifdef DEBUG
 		[](bool success){ std::cout << "PutDHTConfig() " << (success ? "successful" : "unsuccessful") << std::endl; },
-#else
-		[](bool success){ if(! success) std::cout << "PutDHTConfig() unsuccessful" << std::endl; },
-#endif
 		true
 	);
 }
