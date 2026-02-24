@@ -80,6 +80,39 @@ Transcoding requires a DVSI-3000 or DVSI-3003 USB device. When you have the hard
 3. Set `ENABLE_TCD=true` in `docker/docker-compose.yml`
 4. Rebuild and restart: `docker compose build && docker compose down && docker compose up -d`
 
+### Monitoring the DHT
+
+urfd publishes its config and peer data on the [Ham-DHT](https://github.com/savoirfairelinux/opendht) network under a key derived from your callsign. You can query this in real time using `dhtnode`.
+
+**Install on the host:**
+
+```bash
+sudo apt install dhtnode
+```
+
+**Connect and query:**
+
+Port `17171/udp` is exposed on localhost. Bootstrap dhtnode off your own urfd node and query by key:
+
+```bash
+dhtnode -b 127.0.0.1:17171
+```
+
+At the interactive prompt, use the hash of your callsign (e.g. `URF825`):
+
+```
+g bb5007e49e252ffae654f3dd23b14637fe035913   # get current values
+l bb5007e49e252ffae654f3dd23b14637fe035913   # listen for live changes
+```
+
+**Computing the hash for any callsign:**
+
+The key is simply the SHA1 of the callsign string:
+
+```bash
+echo -n "URF825" | sha1sum
+```
+
 ### Auto-start with systemd (user service)
 
 To start the stack automatically at boot without requiring a login session:
