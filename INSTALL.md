@@ -1,4 +1,4 @@
-# URF825 Multimode Reflector — Installation Guide
+# URF Multimode Reflector — Installation Guide
 
 This guide walks you through setting up a URF multimode reflector using Docker on a Linux server. It is written for users who are new to Linux and Docker.
 
