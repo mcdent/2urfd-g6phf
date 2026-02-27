@@ -24,6 +24,7 @@
 #include <mutex>
 #include <list>
 #include <utility>
+#include <vector>
 
 #include "imbe_vocoder.h"
 #include "codec2.h"
@@ -51,7 +52,9 @@ protected:
 	CUnixDgramReader reader;
 	CUnixDgramWriter writer;
 	std::unordered_map<char, std::unique_ptr<CCodec2>> c2_16, c2_32;
-	std::unique_ptr<CDVDevice> dstar_device, dmrsf_device;
+	std::vector<std::unique_ptr<CDVDevice>> dstar_devices, dmrsf_devices;
+	size_t modsPerPair;
+	size_t devicePairForModule(char module) const;
 
 	CPacketQueue codec2_queue;
 	CPacketQueue imbe_queue;

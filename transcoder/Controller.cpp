@@ -74,10 +74,10 @@ void CController::Stop()
 		imbeFuture.get();
 
 	reader.Close();
-	dstar_device->CloseDevice();
-	dmrsf_device->CloseDevice();
-	dstar_device.reset();
-	dmrsf_device.reset();
+	for (auto &d : dstar_devices) d->CloseDevice();
+	for (auto &d : dmrsf_devices) d->CloseDevice();
+	dstar_devices.clear();
+	dmrsf_devices.clear();
 	for (const auto m : g_Conf.GetTCMods())
 	{
 		c2_16[m].reset();
@@ -151,28 +151,23 @@ bool CController::InitVocoders()
 		return true;
 	}
 
-	if (2 != deviceset.size())
+	if (deviceset.empty() || deviceset.size() % 2 != 0)
 	{
-		std::cerr << "Could not find exactly two DVSI devices" << std::endl;
+		std::cerr << "Need an even number of DVSI devices (got " << deviceset.size() << ")" << std::endl;
 		return true;
 	}
 
 	const auto desc(deviceset.front().second);
-	if (deviceset.back().second.compare(desc))
-	{
-		if (desc.compare(0, 9, "USB-3006 ")) // the USB-3006 device doesn't need this check
-		{
-			std::cout << "Both devices should to be the same type: " << desc << " != " << deviceset.back().second << std::endl;
-		}
-	}
-
 	Edvtype dvtype = Edvtype::dv3003;
 	if (0==desc.compare("ThumbDV") || 0==desc.compare("DVstick-30") || 0==desc.compare("USB-3000") || 0==desc.compare("FT230X Basic UART"))
 		dvtype = Edvtype::dv3000;
 
-	if (modules.size() > ((Edvtype::dv3000 == dvtype) ? 1 : 3))
+	const size_t npairs = deviceset.size() / 2;
+	modsPerPair = (Edvtype::dv3000 == dvtype) ? 1 : 3;
+
+	if (modules.size() > npairs * modsPerPair)
 	{
-		std::cerr << "Too many transcoded modules for the devices" << std::endl;
+		std::cerr << "Too many transcoded modules (" << modules.size() << ") for " << npairs << " device pair(s) (max " << npairs * modsPerPair << ")" << std::endl;
 		return true;
 	}
 
@@ -185,51 +180,55 @@ bool CController::InitVocoders()
 		}
 	}
 
-	//initialize each device
+	// initialise each device pair
 	while (! deviceset.empty())
 	{
+		std::unique_ptr<CDVDevice> ds, dm;
 		if (Edvtype::dv3000 == dvtype)
 		{
-			dstar_device = std::make_unique<CDV3000>(Encoding::dstar);
-			dmrsf_device = std::make_unique<CDV3000>(Encoding::dmrsf);
+			ds = std::make_unique<CDV3000>(Encoding::dstar);
+			dm = std::make_unique<CDV3000>(Encoding::dmrsf);
 		}
 		else
 		{
-			dstar_device = std::make_unique<CDV3003>(Encoding::dstar);
-			dmrsf_device = std::make_unique<CDV3003>(Encoding::dmrsf);
+			ds = std::make_unique<CDV3003>(Encoding::dstar);
+			dm = std::make_unique<CDV3003>(Encoding::dmrsf);
 		}
 
-		if (dstar_device)
-		{
-			if (dstar_device->OpenDevice(deviceset.front().first, deviceset.front().second, dvtype, int8_t(g_Conf.GetGain(EGainType::dstarin)), int8_t(g_Conf.GetGain(EGainType::dstarout))))
-				return true;
-			deviceset.pop_front();
-		}
-		else
+		if (!ds || !dm)
 		{
 			std::cerr << "Could not create DVSI devices!" << std::endl;
 			return true;
 		}
-		if (dmrsf_device)
-		{
-			if (dmrsf_device->OpenDevice(deviceset.front().first, deviceset.front().second, dvtype, int8_t(g_Conf.GetGain(EGainType::dmrin)), int8_t(g_Conf.GetGain(EGainType::dmrout))))
-				return true;
-			deviceset.pop_front();
-		}
-		else
-		{
-			std::cerr << "Could not create DVSI devices!" << std::endl;
+
+		if (ds->OpenDevice(deviceset.front().first, deviceset.front().second, dvtype, int8_t(g_Conf.GetGain(EGainType::dstarin)), int8_t(g_Conf.GetGain(EGainType::dstarout))))
 			return true;
-		}
+		deviceset.pop_front();
+
+		if (dm->OpenDevice(deviceset.front().first, deviceset.front().second, dvtype, int8_t(g_Conf.GetGain(EGainType::dmrin)), int8_t(g_Conf.GetGain(EGainType::dmrout))))
+			return true;
+		deviceset.pop_front();
+
+		dstar_devices.push_back(std::move(ds));
+		dmrsf_devices.push_back(std::move(dm));
 	}
 
-	// and start them (or it) up!
-	dstar_device->Start();
-	dmrsf_device->Start();
+	// start all device pairs
+	for (auto &d : dstar_devices) d->Start();
+	for (auto &d : dmrsf_devices) d->Start();
 
 	deviceset.clear();
 
 	return false;
+}
+
+size_t CController::devicePairForModule(char module) const
+{
+	const std::string modules(g_Conf.GetTCMods());
+	const auto pos = modules.find(module);
+	if (pos == std::string::npos)
+		return 0;
+	return pos / modsPerPair;
 }
 
 // Encapsulate the incoming STCPacket into a CTranscoderPacket and push it into the appropriate queue
@@ -249,10 +248,10 @@ void CController::ReadReflectorThread()
 			switch (packet->GetCodecIn())
 			{
 			case ECodecType::dstar:
-				dstar_device->AddPacket(packet);
+				dstar_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 				break;
 			case ECodecType::dmr:
-				dmrsf_device->AddPacket(packet);
+				dmrsf_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 				break;
 			case ECodecType::p25:
 				imbe_queue.push(packet);
@@ -350,8 +349,8 @@ void CController::Codec2toAudio(std::shared_ptr<CTranscoderPacket> packet)
 		}
 	}
 	// the only thing left is to encode the other codecs, so push the packet onto all the other queues
-	dstar_device->AddPacket(packet);
-	dmrsf_device->AddPacket(packet);
+	dstar_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
+	dmrsf_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 	imbe_queue.push(packet);
 }
 
@@ -390,8 +389,8 @@ void CController::IMBEtoAudio(std::shared_ptr<CTranscoderPacket> packet)
 	int16_t tmp[160] = { 0 };
 	p25vocoder[packet->GetModule()]->decode_4400(tmp, (uint8_t*)packet->GetP25Data());
 	packet->SetAudioSamples(tmp, false);
-	dstar_device->AddPacket(packet);
-	dmrsf_device->AddPacket(packet);
+	dstar_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
+	dmrsf_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 	codec2_queue.push(packet);
 }
 
@@ -429,7 +428,7 @@ void CController::RouteDstPacket(std::shared_ptr<CTranscoderPacket> packet)
 		// codec_in is dstar, the audio has just completed, so now calc the M17 and DMR
 		codec2_queue.push(packet);
 		imbe_queue.push(packet);
-		dmrsf_device->AddPacket(packet);
+		dmrsf_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 	}
 	else
 	{
@@ -445,7 +444,7 @@ void CController::RouteDmrPacket(std::shared_ptr<CTranscoderPacket> packet)
 	{
 		codec2_queue.push(packet);
 		imbe_queue.push(packet);
-		dstar_device->AddPacket(packet);
+		dstar_devices[devicePairForModule(packet->GetModule())]->AddPacket(packet);
 	}
 	else
 	{
