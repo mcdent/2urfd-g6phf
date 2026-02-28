@@ -1,3 +1,5 @@
+name: urfd
+
 services:
 
   # ── urfd + tcd ──────────────────────────────────────────────────────────────
@@ -11,7 +13,7 @@ services:
     restart: unless-stopped
     privileged: true
     environment:
-      - ENABLE_TCD=false   # set to true when DVSI hardware is connected
+      - ENABLE_TCD=true    # DVSI hardware connected via USB hub 05e3:0608
     devices:
       - /dev/bus/usb:/dev/bus/usb    # DVSI USB hardware passthrough
     volumes:
@@ -55,6 +57,36 @@ services:
       - "80:80"
     depends_on:
       - urfd
+
+  # ── Metrics (disabled by default) ───────────────────────────────────────────
+  # Enable with:  docker compose --profile metrics up -d
+  # Or set COMPOSE_PROFILES=metrics in a .env file for a permanent opt-in.
+
+  urfd-exporter:
+    profiles: [metrics]
+    build:
+      context: .                           # docker/ directory
+      dockerfile: exporter/Dockerfile
+    container_name: urfd-exporter
+    restart: unless-stopped
+    volumes:
+      - ./logs:/logs:ro                    # urfd.xml and urfd.log
+    ports:
+      - "9101:9101"
+
+  cadvisor:
+    profiles: [metrics]
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: urfd-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
 
 volumes:
   urfd-state:   # DHT state + downloaded DB files (dmrid, nxdn, ysf)
