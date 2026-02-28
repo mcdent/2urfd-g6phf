@@ -39,7 +39,10 @@ class xReflector {
    public function LoadXML() {
       if ($this->XMLFile != null) {
          $handle = fopen($this->XMLFile, 'r');
-         $this->XMLContent = fread($handle, filesize($this->XMLFile));
+         $size = filesize($this->XMLFile);
+         if ($size > 0) {
+            $this->XMLContent = fread($handle, $size);
+         }
          fclose($handle);
 
          $this->ServiceName = substr($this->XMLContent, strpos($this->XMLContent, "<XLX")+4, 3);
