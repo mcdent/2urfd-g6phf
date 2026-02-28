@@ -210,8 +210,12 @@ bool CController::InitVocoders()
 	}
 
 	// initialise each device pair
+	size_t pairIdx = 0;
 	while (! deviceset.empty())
 	{
+		// per-device modules: e.g. pair 0 → "ABC", pair 1 → "DI"
+		const std::string localMods = modules.substr(pairIdx * modsPerPair, modsPerPair);
+
 		std::unique_ptr<CDVDevice> ds, dm;
 		if (Edvtype::dv3000 == dvtype)
 		{
@@ -230,6 +234,9 @@ bool CController::InitVocoders()
 			return true;
 		}
 
+		ds->SetLocalModules(localMods);
+		dm->SetLocalModules(localMods);
+
 		if (ds->OpenDevice(deviceset.front().first, deviceset.front().second, dvtype, int8_t(g_Conf.GetGain(EGainType::dstarin)), int8_t(g_Conf.GetGain(EGainType::dstarout))))
 			return true;
 		deviceset.pop_front();
@@ -240,6 +247,7 @@ bool CController::InitVocoders()
 
 		dstar_devices.push_back(std::move(ds));
 		dmrsf_devices.push_back(std::move(dm));
+		pairIdx++;
 	}
 
 	// start all device pairs

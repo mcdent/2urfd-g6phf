@@ -38,6 +38,8 @@ public:
 	void AddPacket(const std::shared_ptr<CTranscoderPacket> packet);
 	std::string GetProductID() { return productid; }
 
+	void SetLocalModules(const std::string &mods) { local_modules = mods; }
+
 protected:
 	const Encoding type;
 	FT_HANDLE ftHandle;
@@ -45,7 +47,7 @@ protected:
 	std::atomic<bool> keep_running;
 	CPacketQueue input_queue;
 	std::future<void> feedFuture, readFuture;
-	std::string description, productid;
+	std::string description, productid, local_modules;
 
 	bool DiscoverFtdiDevices();
 	bool ConfigureVocoder(uint8_t pkt_ch, Encoding type, int8_t in_gain, int8_t out_gain);
