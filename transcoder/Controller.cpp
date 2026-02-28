@@ -151,9 +151,9 @@ bool CController::InitVocoders()
 		return true;
 	}
 
-	if (deviceset.empty() || deviceset.size() % 2 != 0)
+	if (deviceset.empty())
 	{
-		std::cerr << "Need an even number of DVSI devices (got " << deviceset.size() << ")" << std::endl;
+		std::cerr << "No DVSI devices found" << std::endl;
 		return true;
 	}
 
@@ -162,9 +162,38 @@ bool CController::InitVocoders()
 	if (0==desc.compare("ThumbDV") || 0==desc.compare("DVstick-30") || 0==desc.compare("USB-3000") || 0==desc.compare("FT230X Basic UART"))
 		dvtype = Edvtype::dv3000;
 
-	const size_t npairs = deviceset.size() / 2;
 	modsPerPair = (Edvtype::dv3000 == dvtype) ? 1 : 3;
 
+	// filter out devices that don't match the detected type
+	const bool wantDV3000 = (Edvtype::dv3000 == dvtype);
+	for (auto it = deviceset.begin(); it != deviceset.end(); )
+	{
+		const bool isDV3000 = (it->second == "ThumbDV" || it->second == "DVstick-30" ||
+		                       it->second == "USB-3000" || it->second == "FT230X Basic UART");
+		if (isDV3000 != wantDV3000)
+		{
+			std::cout << "Skipping " << it->second << " SN=" << it->first << " (wrong type for this configuration)" << std::endl;
+			it = deviceset.erase(it);
+		}
+		else
+			++it;
+	}
+
+	// only open as many pairs as needed for the configured modules
+	const size_t pairsNeeded = (modules.size() + modsPerPair - 1) / modsPerPair;
+	while (deviceset.size() > pairsNeeded * 2)
+	{
+		std::cout << "Skipping " << deviceset.back().second << " SN=" << deviceset.back().first << " (not needed for configured modules)" << std::endl;
+		deviceset.pop_back();
+	}
+
+	if (deviceset.empty() || deviceset.size() % 2 != 0)
+	{
+		std::cerr << "Need an even number of DVSI devices after filtering (got " << deviceset.size() << ")" << std::endl;
+		return true;
+	}
+
+	const size_t npairs = deviceset.size() / 2;
 	if (modules.size() > npairs * modsPerPair)
 	{
 		std::cerr << "Too many transcoded modules (" << modules.size() << ") for " << npairs << " device pair(s) (max " << npairs * modsPerPair << ")" << std::endl;
