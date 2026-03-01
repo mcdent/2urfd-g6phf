@@ -7,9 +7,11 @@ urfd.log incrementally for event counters.
 Metrics exposed on :9101/metrics
 """
 
+import datetime
 import os
 import re
 import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from prometheus_client import (
@@ -34,6 +36,10 @@ c_packets  = Counter(
     'urfd_stream_packets', 'Packets in completed transcoded streams',
     ['module'], registry=registry)
 
+c_duration = Counter(
+    'urfd_stream_active_seconds', 'Total seconds of active stream time — use rate() for busy graph',
+    ['module'], registry=registry)
+
 c_connects = Counter(
     'urfd_client_events', 'Client connect/disconnect events',
     ['protocol', 'module', 'event'], registry=registry)
@@ -46,20 +52,18 @@ c_orphaned = Counter(
     'urfd_orphaned_frames', 'Orphaned (header-less) frames received',
     ['module'], registry=registry)
 
-# ── TC latency — last completed stream per module ────────────────────────────
-# Stored as dict {module: (min_ms, avg_ms, max_ms)}, yielded by the collector.
+# ── Mutable state (all protected by _lock) ───────────────────────────────────
 
-_tc      = {}
-_tc_lock = threading.Lock()
-
-# ── Log tail state ────────────────────────────────────────────────────────────
-
+_tc              = {}   # module -> (min_ms, avg_ms, max_ms)   last stream
+_active_streams  = {}   # module -> int   currently open stream count
+_open_times      = {}   # module -> [log_timestamp, ...]  FIFO open times
+_pending_modules = []   # FIFO: modules awaiting their TC time line
 _log_pos         = 0
-_pending_modules = []   # FIFO queue: modules awaiting their TC time line
 _lock            = threading.Lock()
 
 # ── Log line patterns ─────────────────────────────────────────────────────────
 
+RE_TS      = re.compile(r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z')
 RE_OPEN    = re.compile(r'Opening stream on module (\w)')
 RE_CLOSE   = re.compile(r'Closing stream of module (\w)')
 RE_TC      = re.compile(r'TC round-trip time\(ms\): ([\d.]+)/([\d.]+)/([\d.]+), (\d+) total packets')
@@ -69,9 +73,22 @@ RE_TIMEOUT = re.compile(r'(\w+) client .+ keepalive timeout')
 RE_ORPHAN  = re.compile(r'Orphaned Frame.+module (\w)', re.IGNORECASE)
 
 
+def _line_ts(line):
+    """Parse the ISO 8601 UTC timestamp from a log line; fall back to now."""
+    m = RE_TS.match(line)
+    if m:
+        try:
+            return datetime.datetime.strptime(
+                m.group(1), '%Y-%m-%dT%H:%M:%S'
+            ).replace(tzinfo=datetime.timezone.utc).timestamp()
+        except ValueError:
+            pass
+    return time.time()
+
+
 def tail_log():
     """Read any new lines appended to urfd.log since the last call."""
-    global _log_pos, _pending_modules
+    global _log_pos, _pending_modules, _active_streams, _open_times
 
     try:
         size = os.path.getsize(LOG_FILE)
@@ -87,16 +104,25 @@ def tail_log():
         f.seek(_log_pos)
         for line in f:
             if m := RE_OPEN.search(line):
-                c_streams.labels(module=m.group(1)).inc()
+                mod = m.group(1)
+                c_streams.labels(module=mod).inc()
+                _active_streams[mod] = _active_streams.get(mod, 0) + 1
+                _open_times.setdefault(mod, []).append(_line_ts(line))
 
             elif m := RE_CLOSE.search(line):
-                _pending_modules.append(m.group(1))
+                mod = m.group(1)
+                _pending_modules.append(mod)
+                _active_streams[mod] = max(0, _active_streams.get(mod, 0) - 1)
+                times = _open_times.get(mod, [])
+                if times:
+                    duration = _line_ts(line) - times.pop(0)
+                    if duration > 0:
+                        c_duration.labels(module=mod).inc(duration)
 
             elif m := RE_TC.search(line):
                 if _pending_modules:
                     mod = _pending_modules.pop(0)
-                    with _tc_lock:
-                        _tc[mod] = (float(m.group(1)), float(m.group(2)), float(m.group(3)))
+                    _tc[mod] = (float(m.group(1)), float(m.group(2)), float(m.group(3)))
                     c_packets.labels(module=mod).inc(int(m.group(4)))
 
             elif m := RE_ADD.search(line):
@@ -130,7 +156,7 @@ def _parse_blocks(content, tag):
 
 
 class UrfdCollector:
-    """Custom collector — merges XML gauges with persisted TC latency."""
+    """Custom collector — merges XML gauges with persisted log-derived state."""
 
     def describe(self):
         return []   # lazy registration; no pre-check needed
@@ -145,6 +171,17 @@ class UrfdCollector:
         except OSError:
             pass
 
+        now = time.time()
+
+        # ── Reflector version info ─────────────────────────────────────────
+        g_info = GaugeMetricFamily(
+            'urfd_info', 'Reflector version info (value always 1)',
+            labels=['version'])
+        m = re.search(r'<Version>(.*?)</Version>', content)
+        if m:
+            g_info.add_metric([m.group(1).strip()], 1)
+        yield g_info
+
         # ── Connected nodes (by protocol and module) ──────────────────────────
         g_nodes = GaugeMetricFamily(
             'urfd_nodes_connected',
@@ -158,18 +195,25 @@ class UrfdCollector:
             g_nodes.add_metric([proto, mod], n)
         yield g_nodes
 
-        # ── Linked interlink peers ────────────────────────────────────────────
+        # ── Linked interlink peers ─────────────────────────────────────────────
         g_peers = GaugeMetricFamily(
             'urfd_peers_linked',
             'Interlink peers currently linked (1 = linked)',
             labels=['callsign', 'module', 'protocol'])
+        g_peer_age = GaugeMetricFamily(
+            'urfd_peer_last_heard_seconds',
+            'Seconds since this interlink peer was last heard',
+            labels=['callsign', 'module', 'protocol'])
         for peer in _parse_blocks(content, 'PEER'):
-            g_peers.add_metric([
-                peer.get('Callsign', '?').strip(),
-                peer.get('LinkedModule', '?'),
-                peer.get('Protocol', '?'),
-            ], 1)
+            callsign = peer.get('Callsign', '?').strip()
+            mod      = peer.get('LinkedModule', '?')
+            proto    = peer.get('Protocol', '?')
+            g_peers.add_metric([callsign, mod, proto], 1)
+            lh = peer.get('LastHeardTime', '')
+            if lh.isdigit():
+                g_peer_age.add_metric([callsign, mod, proto], now - int(lh))
         yield g_peers
+        yield g_peer_age
 
         # ── Heard users per module ────────────────────────────────────────────
         g_heard = GaugeMetricFamily(
@@ -184,6 +228,19 @@ class UrfdCollector:
             g_heard.add_metric([mod], n)
         yield g_heard
 
+        # ── Currently active streams ──────────────────────────────────────────
+        with _lock:
+            active_snapshot = dict(_active_streams)
+            tc_snapshot     = dict(_tc)
+
+        g_active = GaugeMetricFamily(
+            'urfd_streams_active',
+            'Number of streams currently open (currently on-air)',
+            labels=['module'])
+        for mod, n in active_snapshot.items():
+            g_active.add_metric([mod], n)
+        yield g_active
+
         # ── TC round-trip latency (last stream per module) ────────────────────
         g_tc_min = GaugeMetricFamily(
             'urfd_tc_roundtrip_min_milliseconds',
@@ -194,11 +251,10 @@ class UrfdCollector:
         g_tc_max = GaugeMetricFamily(
             'urfd_tc_roundtrip_max_milliseconds',
             'Maximum TC round-trip time of last stream (ms)', labels=['module'])
-        with _tc_lock:
-            for mod, (mn, avg, mx) in _tc.items():
-                g_tc_min.add_metric([mod], mn)
-                g_tc_avg.add_metric([mod], avg)
-                g_tc_max.add_metric([mod], mx)
+        for mod, (mn, avg, mx) in tc_snapshot.items():
+            g_tc_min.add_metric([mod], mn)
+            g_tc_avg.add_metric([mod], avg)
+            g_tc_max.add_metric([mod], mx)
         yield g_tc_min
         yield g_tc_avg
         yield g_tc_max
