@@ -80,6 +80,8 @@ services:
     container_name: urfd-cadvisor
     restart: unless-stopped
     privileged: true
+    command:
+      - --store_container_labels=false   # drop noisy compose metadata labels
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
