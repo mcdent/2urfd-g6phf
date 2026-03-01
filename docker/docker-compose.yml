@@ -82,6 +82,7 @@ services:
     privileged: true
     command:
       - --store_container_labels=false   # drop noisy compose metadata labels
+      - --disable_metrics=disk           # drop container_fs_* (device paths exceed label length limits)
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
