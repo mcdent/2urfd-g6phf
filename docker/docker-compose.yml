@@ -27,6 +27,9 @@ services:
       - urfd-state:/var/lib/urfd
       # All logs (shared with dashboard)
       - ./logs:/logs
+    networks:
+      default:
+        ipv4_address: 172.20.0.4   # fixed — hblink3 connects directly to this IP
     ports:
       - "10017:10017/udp"   # URF interlinking
       - "17000:17000/udp"   # M17
@@ -93,3 +96,10 @@ services:
 
 volumes:
   urfd-state:   # DHT state + downloaded DB files (dmrid, nxdn, ysf)
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

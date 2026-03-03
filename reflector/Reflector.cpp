@@ -60,6 +60,7 @@ bool CReflector::Start(void)
 #ifndef NO_DHT
 	// start the dht instance
 	refhash = dht::InfoHash::get(cs);
+	std::cout << "DHT refhash for " << cs << ": " << refhash.toString() << std::endl;
 	node.run(17171, dht::crypto::generateIdentity(cs), true, 59973);
 	std::ifstream myfile;
 	const auto path(g_Configure.Contains(g_Keys.files.dht) ? g_Configure.GetString(g_Keys.files.dht) : "");
