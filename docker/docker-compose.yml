@@ -56,6 +56,8 @@ services:
       - ./logs:/logs
       # User-edited dashboard config
       - ./config/dashboard-config.inc.php:/var/www/html/pgs/config.inc.php:ro
+      # nginx site config — serves dashboard at /xlx, 404 everywhere else
+      - ./nginx/urfd.conf:/etc/nginx/sites-available/urfd:ro
     ports:
       - "80:80"
     depends_on:

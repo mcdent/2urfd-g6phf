@@ -13,8 +13,9 @@ tcd
 docker/logs/*
 !docker/logs/.gitkeep
 
-# Allow docker service unit and .example templates (override the urfd.* / tcd.* rules above)
+# Allow docker service unit, nginx config and .example templates (override the urfd.* / tcd.* rules above)
 !docker/urfd.service
+!docker/nginx/urfd.conf
 !docker/config/urfd.ini.example
 !docker/config/urfd.blacklist.example
 !docker/config/urfd.whitelist.example
