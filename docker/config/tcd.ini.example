@@ -1,0 +1,11 @@
+###### TCD CONFIGURATION ######
+# Copy to tcd.ini and edit before starting the container.
+
+[Transcoder]
+# Transcoded must match the Transcoded value in urfd.ini
+Transcoded    = D
+
+DStarGainIn   =  16
+DStarGainOut  = -16
+DmrYsfGainIn  =  -3
+DmrYsfGainOut =   0

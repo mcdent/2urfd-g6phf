@@ -1,18 +1,18 @@
 ###### URFD CONFIGURATION ######
-# Edit this file before starting the container.
+# Copy to urfd.ini and edit before starting the container.
 # Do not use quotes, unless in a comment!
 
 [Names]
-Callsign = URF825
+Callsign = URF???          # your reflector callsign, e.g. URF825
 
-SysopEmail = example@example.com
+SysopEmail = me@example.com
 
 # 2-letter country codes: https://www.iban.com/country-codes
-Country = GB
+Country = XX
 
-Sponsor = G6PHF
+Sponsor = YOUR_CALLSIGN
 
-DashboardUrl = http://xlx.g6phf.co.uk
+DashboardUrl = http://YOUR_DASHBOARD_URL
 
 # Bootstrap: address of any existing DHT node
 Bootstrap = xrf757.openquad.net
@@ -20,7 +20,7 @@ Bootstrap = xrf757.openquad.net
 [IP Addresses]
 IPv4Binding = 0.0.0.0
 # IPv6Binding = ::
-IPv4External = 82.68.53.241
+# IPv4External = 1.2.3.4   # uncomment and set if urfd cannot detect your public IP
 # IPv6External = f:e:d:c:b:a:9:0
 
 [Modules]
@@ -61,12 +61,12 @@ DefaultId = 0
 [NXDN]
 Port = 41400
 AutoLinkModule = D
-ReflectorID = 825
+ReflectorID = 12345        # your NXDN reflector ID
 
 [P25]
 Port = 41000
 AutoLinkModule = D
-ReflectorID = 825 
+ReflectorID = 12345        # your P25 reflector ID
 
 [URF]
 Port = 10017
@@ -76,8 +76,8 @@ Port = 42000
 AutoLinkModule = D
 DefaultTxFreq = 446500000
 DefaultRxFreq = 446500000
-RegistrationID = 00825 
-RegistrationName = UK XLX825
+RegistrationID = 00000     # your YSF registration ID
+RegistrationName = YOUR_REFLECTOR_NAME
 RegistrationDescription = URF Reflector
 
 [DMR ID DB]
