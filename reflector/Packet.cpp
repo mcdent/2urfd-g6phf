@@ -60,6 +60,7 @@ CPacket::CPacket(const CBuffer &buf)
 		m_uiYsfPacketId      = data[17];
 		m_uiYsfPacketSubId   = data[18];
 		m_uiYsfPacketFrameId = data[19];
+		m_uiNXDNPacketId     = 0xFF;  // not in wire format; sentinel triggers UpdatePids() at receiver
 	}
 	else
 		std::cerr << "CPacket initialization failed because the buffer is too small!" << std::endl;
