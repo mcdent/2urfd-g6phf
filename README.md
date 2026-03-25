@@ -7,6 +7,7 @@ A smaller and slightly faster *urfd* reflector. The sources are published under 
 ## Docker Deployment (G6PHF fork)
 
 This fork adds a Docker-based deployment under `docker/`. It packages *urfd* and the dashboard into separate containers managed by Docker Compose, with optional *tcd* support for when DVSI transcoding hardware is available.
+This fork also adds support for > 2 ambe transcoding sticks.
 
 ### Changes from upstream
 

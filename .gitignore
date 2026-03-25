@@ -24,3 +24,7 @@ docker/logs/*
 
 # dashboard config has no wildcard rule above, so explicitly ignore the real file only
 docker/config/dashboard-config.inc.php
+
+# Local user documentation — not for the public repo
+INSTRUCTIONS.md
+INSTRUCTIONS-FACEBOOK.txt
